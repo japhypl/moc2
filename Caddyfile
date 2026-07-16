@@ -1,0 +1,10 @@
+# Production: replace with Cloudflare Origin Certificate paths
+# mocplomienia.pl {
+#     tls /etc/ssl/cloudflare-origin.pem /etc/ssl/cloudflare-origin-key.pem
+#     reverse_proxy app:3000
+# }
+
+# Local development / staging
+:80 {
+    reverse_proxy app:3000
+}

@@ -4,28 +4,73 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Moc Płomienia — a Polish women's event, VOD, and workshop platform at mocplomienia.pl. All user-facing content is in Polish. The project is currently in the specification phase (see `project-nextjs.md` and `gpt.md`).
+Moc Płomienia — a Polish women's event, VOD, and workshop platform at mocplomienia.pl. All user-facing content is in Polish. The full specification is in `project-nextjs.md`.
 
 ## Architecture
 
-There are two specification documents with partially overlapping but diverging stack recommendations:
+Supabase-centric — Next.js 15 App Router + Supabase (auth, DB, Edge Functions, storage) + Refine admin panel. No separate backend service. Supabase Edge Functions (Deno) handle all server-side payment logic. Edge Functions are designed as extractable modules: pure business-logic imports + thin HTTP wrapper. Next.js API routes are used only for lightweight proxying or ISR revalidation.
 
-- **`project-nextjs.md`**: Supabase-centric — Next.js 15 App Router + Supabase (auth, DB, Edge Functions, storage) + Refine admin panel. No separate backend service.
-- **`gpt.md`**: Separate backend — Next.js frontend + NestJS API + PostgreSQL + Redis + BullMQ workers. More traditional monorepo with `apps/web`, `apps/api`, `apps/worker`, `packages/*`.
+## Build Commands
 
-**Confirm with the project owner which architecture to follow before starting implementation.** The business rules and data model are consistent across both documents.
+```bash
+npm run dev          # Start Next.js dev server
+npm run build        # Production build
+npm run lint         # ESLint
+npm run typecheck    # TypeScript check (tsc --noEmit)
+npm run format       # Prettier format
+npm run format:check # Prettier check
 
-## Stack (common across both specs)
+# Supabase (requires Supabase CLI: npm install -g supabase)
+npx supabase start            # Start local Supabase (DB, Auth, Storage, Edge Functions)
+npx supabase functions serve   # Serve Edge Functions locally
+
+# Docker
+docker compose up -d           # Run production build locally
+docker compose build           # Rebuild image
+```
+
+## Project Structure
+
+```
+app/
+├── (public)/          # Public pages: homepage, events, VOD, workshops, legal
+├── (auth)/            # Login, verification, logout, payment status (noindex)
+├── (customer)/konto/  # Customer dashboard: recordings, materials, orders (noindex)
+├── (admin)/admin/     # Refine admin panel (noindex)
+├── api/revalidate/    # ISR on-demand revalidation endpoint
+├── layout.tsx         # Root layout (fonts, metadata)
+├── not-found.tsx      # Custom 404
+├── robots.ts          # Robots.txt generation
+└── sitemap.ts         # Dynamic sitemap
+
+lib/
+├── supabase/          # Supabase clients (browser, server, middleware)
+└── utils/             # Shared utilities (cn helper)
+
+supabase/
+├── config.toml        # Supabase project config
+└── functions/         # 6 Edge Functions (Deno):
+    ├── create-paynow-payment/     # Validate product, create order, call Paynow API
+    ├── paynow-notification/       # Webhook receiver, signature verification, entitlement grant
+    ├── get-order-status/          # Order status for payment status page
+    ├── retry-paynow-payment/      # New payment attempt for existing unpaid order
+    ├── create-paynow-refund/      # Admin-only refund via Paynow API
+    └── issue-video-playback-token/ # Auth + entitlement check → signed video URL
+
+middleware.ts          # Supabase session refresh on every request
+```
+
+## Stack
 
 - **Frontend**: Next.js 15 (App Router), Tailwind CSS 4, Radix UI
-- **Database**: PostgreSQL — UUIDs for PKs, money in minor units (grosze), `created_at`/`updated_at` timestamps on all tables
-- **Auth**: Passwordless magic-link login
+- **Database**: Supabase (PostgreSQL) — UUIDs for PKs, money in minor units (grosze), `created_at`/`updated_at` timestamps on all tables
+- **Auth**: Supabase Auth, passwordless magic-link login
 - **Payments**: Paynow V3 hosted checkout (no Stripe, no Paddle)
 - **Ticketing**: Tixx.pl (external — do not duplicate ticket inventory locally)
 - **Video**: Mux or Cloudflare Stream (signed/tokenized playback)
-- **Admin**: Refine with Supabase data provider (in `project-nextjs.md`) or custom admin
+- **Admin**: Refine with Supabase data provider
 - **Deployment**: Docker on VPS behind Cloudflare CDN/WAF, Caddy reverse proxy
-- **CI/CD**: GitHub Actions
+- **CI/CD**: GitHub Actions (lint → typecheck → build → push image → deploy)
 
 ## Critical Business Rules
 
@@ -64,6 +109,8 @@ There are two specification documents with partially overlapping but diverging s
 
 - Brand: warm luxury, sisterhood, contemporary elegance
 - Colors: warm off-white (#FAF7F2), muted gold (#C5A55A), deep navy (#1B2432)
+- Fonts: Playfair Display (headings), Inter (body) — loaded via `next/font`
+- CSS utility: `cn()` from `lib/utils/cn.ts` (clsx + tailwind-merge)
 - Mobile-first: design at 360px, test at 360/390/430/768/1024/1440px
 - Avoid: bright pink, autoplay video, heavy parallax, low-contrast gold text, excessive animation
 - Accessibility: WCAG 2.2 AA target
