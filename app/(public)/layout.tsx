@@ -1,3 +1,6 @@
+import { Header } from "@/components/layout/header";
+import { Footer } from "@/components/layout/footer";
+
 export default function PublicLayout({
   children,
 }: {
@@ -5,9 +8,9 @@ export default function PublicLayout({
 }) {
   return (
     <>
-      {/* TODO: Public header/navigation */}
+      <Header />
       <main>{children}</main>
-      {/* TODO: Public footer */}
+      <Footer />
     </>
   );
 }

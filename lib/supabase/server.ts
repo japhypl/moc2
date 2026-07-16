@@ -6,8 +6,12 @@ export async function createClient() {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error(
-      "Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    // Return a client pointed at a non-existent URL — all queries will
+    // fail gracefully and return empty data, allowing dev without Supabase.
+    return createServerClient(
+      "http://localhost:54321",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder",
+      { cookies: { getAll: () => [], setAll: () => {} } },
     );
   }
 
