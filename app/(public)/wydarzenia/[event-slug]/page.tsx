@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { Metadata } from "next";
+import Image from "next/image";
 
 import { getEventBySlug } from "@/lib/supabase/queries";
 import { Container } from "@/components/layout/container";
@@ -115,11 +116,13 @@ export default async function EventPage({ params }: Props) {
 
           {/* Cover image */}
           {event.cover_image && (
-            <div className="mt-8">
-              <img
+            <div className="relative mt-8 aspect-video w-full overflow-hidden rounded-lg">
+              <Image
                 src={event.cover_image}
                 alt={event.title}
-                className="w-full rounded-lg object-cover"
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1200px"
               />
             </div>
           )}

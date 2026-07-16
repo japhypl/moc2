@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { Metadata } from "next";
+import Image from "next/image";
 
 import { getWorkshopBySlug } from "@/lib/supabase/queries";
 import { formatPrice } from "@/components/product-card";
@@ -99,11 +100,15 @@ export default async function WorkshopPage({ params }: Props) {
         )}
 
         {workshop.cover_image && (
-          <img
-            src={workshop.cover_image}
-            alt={workshop.title}
-            className="mt-6 w-full rounded-lg object-cover"
-          />
+          <div className="relative mt-6 aspect-video w-full overflow-hidden rounded-lg">
+            <Image
+              src={workshop.cover_image}
+              alt={workshop.title}
+              fill
+              className="object-cover"
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1200px"
+            />
+          </div>
         )}
 
         {workshop.description && (

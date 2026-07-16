@@ -18,6 +18,7 @@ import {
   AccordionTrigger,
   AccordionContent,
 } from "@/components/ui/accordion";
+import { NewsletterForm } from "@/components/newsletter-form";
 import {
   getSiteSettings,
   getPublishedEvents,
@@ -427,18 +428,7 @@ export default async function HomePage() {
               Bądź na bieżąco z nadchodzącymi wydarzeniami, nowymi nagraniami
               i ekskluzywnymi ofertami.
             </p>
-            <form className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <input
-                type="email"
-                name="email"
-                placeholder="Twój adres e-mail"
-                required
-                className="flex-1 rounded-button border border-border bg-background-primary px-4 py-3 text-text-dark placeholder:text-text-muted focus:outline-2 focus:outline-accent-gold"
-              />
-              <Button type="submit" variant="cta" size="md">
-                Zapisz się
-              </Button>
-            </form>
+            <NewsletterForm />
             <p className="mt-3 text-xs text-text-light/60">
               Zapisując się, wyrażasz zgodę na otrzymywanie wiadomości
               e-mail od Moc Płomienia. Możesz się wypisać w każdej chwili.

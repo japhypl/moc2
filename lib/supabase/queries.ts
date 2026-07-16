@@ -91,7 +91,8 @@ export async function getPublishedProducts(): Promise<
   return (products ?? []).map((p) => {
     const rec = p as unknown as Record<string, unknown> & { product_prices?: ProductPrice[] };
     const activePrice = rec.product_prices?.find((pp) => pp.is_active) ?? null;
-    const { product_prices: _, ...product } = p as unknown as Product & { product_prices?: ProductPrice[] };
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { product_prices, ...product } = p as unknown as Product & { product_prices?: ProductPrice[] };
     return { ...product, active_price: activePrice };
   });
 }
@@ -135,7 +136,8 @@ export async function getProductBySlug(slug: string): Promise<
   const typed = product as unknown as Product & { product_prices?: ProductPrice[] };
   const activePrice = typed.product_prices?.find((pp) => pp.is_active) ?? null;
 
-  const { product_prices: _, ...rest } = typed;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { product_prices, ...rest } = typed;
 
   return {
     ...rest,

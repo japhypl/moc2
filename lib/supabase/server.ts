@@ -26,7 +26,7 @@ export async function createClient() {
         return () => chainProxy;
       },
     });
-    return { from: () => chainProxy, auth: { getUser: () => Promise.resolve({ data: { user: null }, error: null }), getSession: () => Promise.resolve({ data: { session: null }, error: null }) }, storage: { from: () => chainProxy } } as ReturnType<typeof createServerClient>;
+    return { from: () => chainProxy, auth: { getUser: () => Promise.resolve({ data: { user: null }, error: null }), getSession: () => Promise.resolve({ data: { session: null }, error: null }) }, storage: { from: () => chainProxy } } as unknown as ReturnType<typeof createServerClient>;
   }
 
   const cookieStore = await cookies();
