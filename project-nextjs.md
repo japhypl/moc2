@@ -1,6 +1,6 @@
 # MOC PŁOMIENIA — REVISED PROJECT SPECIFICATION
 
-**Stack: Next.js · Supabase · Refine · Paynow · Tixx.pl · VPS**
+**Stack: Next.js · Supabase · Refine · Paynow · Tixx.pl · VPS · Cloudflare**
 
 ---
 
@@ -41,6 +41,7 @@ The platform sells:
 | Transactional email | **Resend, Postmark, or Brevo** | Order confirmations, magic links, access grants |
 | Newsletter/CRM | **Existing or new provider** | Marketing automation |
 | Analytics | **GA4 + GTM + Meta Pixel** | Behind consent |
+| CDN / WAF / DNS | **Cloudflare** (free or Pro) | DDoS protection, WAF, rate limiting, edge caching, DNS, SSL termination |
 | Hosting | **VPS (Hetzner or similar)** | Docker, Nginx/Caddy, CI/CD |
 | Source control | **GitHub** — company-controlled repo | From day one |
 | CI/CD | **GitHub Actions** | Build, test, deploy to VPS |
@@ -50,6 +51,7 @@ The platform sells:
 - **No Lovable.** The entire frontend, admin panel, and deployment are self-owned.
 - **No Stripe. No Paddle.** Paynow is the only payment provider.
 - **Supabase Edge Functions** handle all server-side payment logic. No secrets ever reach the browser.
+- **Edge Functions are designed as extractable modules.** Each function imports pure business-logic modules (e.g., `lib/payments/create-order.ts`, `lib/payments/verify-signature.ts`, `lib/entitlements/grant.ts`). The Edge Function handler is a thin HTTP wrapper. If the project later needs a dedicated backend (NestJS, Fastify, etc.) with queues and workers, the business logic moves without rewriting — only the handler layer changes.
 - **Next.js API routes** are used only for lightweight proxying or ISR revalidation — payment logic stays in Edge Functions where Supabase RLS and service-role access are native.
 - **Refine** generates admin CRUD and connects directly to Supabase via its data provider. Custom pages are added for payment inspection, entitlement management, and audit logs.
 
@@ -453,6 +455,7 @@ The objective is access control and reduction of casual sharing, not an impossib
 - Refine app mounted at `/admin/*` inside the Next.js app (or as a separate build behind the same domain with path-based routing in Nginx/Caddy).
 - Uses `@refinedev/supabase` data provider.
 - Protected by Supabase Auth — requires `admin` role in `user_roles`.
+- **Admin MFA required.** All admin accounts must enable TOTP (time-based one-time password) via Supabase Auth MFA. The admin layout checks the `aal2` assurance level — admins who haven't completed MFA verification are redirected to an MFA challenge screen. Admin routes are inaccessible at `aal1` (password/magic-link only).
 - Service-role operations (entitlement grants, refunds) go through Edge Functions, not direct DB writes.
 
 ### 13.2 Admin sections
@@ -738,6 +741,8 @@ Implementation:
 - Deferred video players (click-to-load pattern)
 - Limited third-party scripts (behind consent)
 - No heavy hero animation
+- Cloudflare edge caching for static assets (`/_next/static/*`, images, fonts)
+- Cloudflare Polish (compression) enabled for origin responses
 
 ---
 
@@ -949,20 +954,63 @@ Per migration batch: source count, imported count, rejected count, duplicate cou
 
 ---
 
-## 26. VPS DEPLOYMENT
+## 26. INFRASTRUCTURE AND DEPLOYMENT
 
-### Server setup:
+### Network topology:
+```
+Internet
+  │
+Cloudflare (DNS + CDN + WAF)
+  │
+VPS (Hetzner or similar)
+  │
+Caddy / Nginx (reverse proxy, origin SSL)
+  │
+Next.js app (:3000)
+```
+
+All traffic passes through Cloudflare before reaching the VPS. The VPS origin IP is never exposed publicly.
+
+### Cloudflare (free or Pro plan):
+- **DNS:** All domain records managed in Cloudflare (mocplomienia.pl, staging.mocplomienia.pl)
+- **Proxy mode:** Orange-cloud enabled — all HTTP traffic routed through Cloudflare edge
+- **SSL mode:** Full (Strict) — Cloudflare ↔ origin uses a Cloudflare Origin Certificate or Let's Encrypt
+- **WAF:** Enable managed rulesets (OWASP Core, Cloudflare Managed)
+- **Rate limiting:** Apply rules to sensitive endpoints:
+  - `/api/*` (revalidation webhooks) — 60 req/min per IP
+  - Supabase Edge Function URLs (paynow-notification, create-paynow-payment) — configure rate limiting at the Supabase/Cloudflare level
+  - Login/magic-link requests — 10 req/min per IP
+- **DDoS protection:** Automatic on all plans
+- **Bot management:** Challenge suspicious automated traffic
+- **Caching:** Cache static assets (images, fonts, JS/CSS bundles) at the edge. Set `Cache-Control` headers from Next.js. Do not cache HTML for authenticated or dynamic routes.
+- **Page Rules / Cache Rules:**
+  - `mocplomienia.pl/admin/*` → bypass cache
+  - `mocplomienia.pl/konto/*` → bypass cache
+  - `mocplomienia.pl/platnosc/*` → bypass cache
+  - Static assets (`/_next/static/*`) → cache everything, edge TTL 1 year
+- **Security headers:** Add via Cloudflare Transform Rules or origin Caddy config:
+  - `Strict-Transport-Security: max-age=31536000; includeSubDomains`
+  - `X-Content-Type-Options: nosniff`
+  - `X-Frame-Options: DENY`
+  - `Referrer-Policy: strict-origin-when-cross-origin`
+  - `Permissions-Policy: camera=(), microphone=(), geolocation=()`
+- **Firewall rules:**
+  - Block direct access to origin IP (only Cloudflare IPs allowed — configure in VPS firewall)
+  - Allow Paynow notification IPs if Paynow publishes an IP allowlist, otherwise validate via signature only
+
+### VPS setup:
 - **OS:** Ubuntu 24.04 LTS or Debian 12
-- **Reverse proxy:** Caddy (automatic HTTPS) or Nginx + Certbot
-- **Runtime:** Node.js 22 LTS via Docker or nvm
-- **Process manager:** Docker Compose (preferred) or PM2
+- **Firewall:** UFW — allow ports 80/443 only from [Cloudflare IP ranges](https://www.cloudflare.com/ips/), allow SSH from your IP only
+- **Reverse proxy:** Caddy (with Cloudflare Origin Certificate) or Nginx
+- **Runtime:** Node.js 22 LTS via Docker
+- **Process manager:** Docker Compose
 - **CI/CD:** GitHub Actions → build → push Docker image → deploy
 
 ### Docker setup:
 ```
 docker-compose.yml
 ├── app (Next.js production build)
-├── caddy (reverse proxy + SSL)
+├── caddy (reverse proxy, origin SSL)
 ```
 
 ### Deployment flow:
@@ -970,16 +1018,19 @@ docker-compose.yml
 2. GitHub Actions runs: lint → type-check → build → push image to GitHub Container Registry (or Docker Hub).
 3. GitHub Actions SSHs to VPS (or uses a deployment webhook).
 4. VPS pulls new image and restarts via `docker compose up -d`.
-5. Caddy handles SSL termination and routing.
+5. Caddy terminates origin SSL and proxies to the app.
 6. Health check confirms the new deployment is serving.
+7. Cloudflare edge automatically picks up the new version (no purge needed for HTML; purge static assets if filenames don't change).
 
 ### Domain routing (Caddy example):
 ```
 mocplomienia.pl {
+    tls /etc/ssl/cloudflare-origin.pem /etc/ssl/cloudflare-origin-key.pem
     reverse_proxy app:3000
 }
 
 staging.mocplomienia.pl {
+    tls /etc/ssl/cloudflare-origin.pem /etc/ssl/cloudflare-origin-key.pem
     reverse_proxy app-staging:3000
     basicauth * {
         staging $2a$... # password-protect staging
@@ -988,10 +1039,11 @@ staging.mocplomienia.pl {
 ```
 
 ### Monitoring:
-- **Uptime:** UptimeRobot, Hetrixtools, or similar (free tier)
+- **Uptime:** Cloudflare Health Checks (free) + UptimeRobot or Hetrixtools as backup
 - **Errors:** Sentry (free tier)
 - **Logs:** Docker logs + optional log aggregation (Loki, Logtail)
 - **Performance:** Web Vitals reporting via `next/web-vitals` → GA4
+- **Security:** Cloudflare Security Analytics dashboard — review blocked threats, rate limit hits, bot scores
 
 ### Backups:
 - Supabase handles database backups (daily, point-in-time on Pro plan)
@@ -1013,12 +1065,14 @@ staging.mocplomienia.pl {
 - Set up GitHub repo with Next.js, Tailwind, Radix UI, Refine
 - Create Supabase project, connect to GitHub
 - Set up VPS, Docker, CI/CD pipeline
-- Configure staging domain
+- Set up Cloudflare: DNS, proxy mode, SSL Full (Strict), Origin Certificate, WAF rulesets, rate limiting rules, firewall (restrict VPS to Cloudflare IPs)
+- Configure staging domain (behind Cloudflare + basic auth)
 - Inventory current content, customers, and redirects
 - Assign legal work
 
 **Exit criteria:**
-- Repo builds and deploys to staging
+- Repo builds and deploys to staging through Cloudflare
+- VPS is not directly accessible — only Cloudflare IPs allowed
 - Paynow access confirmed
 - Migration sources identified
 - No unresolved platform contradictions
