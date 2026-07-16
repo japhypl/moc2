@@ -50,7 +50,9 @@ export default async function WorkshopPage({ params }: Props) {
     notFound();
   }
 
-  const formattedDate = dateFormatter.format(new Date(workshop.date));
+  const formattedDate = workshop.date
+    ? dateFormatter.format(new Date(workshop.date))
+    : null;
   const formattedEndDate = workshop.end_date
     ? dateFormatter.format(new Date(workshop.end_date))
     : null;

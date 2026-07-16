@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import { Metadata } from "next";
-import Link from "next/link";
 
 import { getEventBySlug } from "@/lib/supabase/queries";
 import { Container } from "@/components/layout/container";
@@ -109,7 +108,7 @@ export default async function EventPage({ params }: Props) {
 
           {/* Date & venue */}
           <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-text-muted">
-            <span>{formatDate(event.date)}</span>
+            {event.date && <span>{formatDate(event.date)}</span>}
             {event.venue_name && <span>{event.venue_name}</span>}
             {event.venue_city && <span>{event.venue_city}</span>}
           </div>
@@ -172,8 +171,8 @@ export default async function EventPage({ params }: Props) {
                   <SpeakerCard
                     key={speaker.id}
                     name={speaker.name}
-                    bio={speaker.bio}
-                    photo={speaker.photo}
+                    bio={speaker.bio ?? undefined}
+                    photo={speaker.photo ?? undefined}
                   />
                 ))}
               </div>

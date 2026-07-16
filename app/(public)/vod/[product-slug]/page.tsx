@@ -7,7 +7,7 @@ import { formatPrice } from "@/components/product-card";
 import { Section } from "@/components/layout/section";
 import { Container } from "@/components/layout/container";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
-import { Button } from "@/components/ui/button";
+import { Checkout } from "./checkout";
 
 export const revalidate = 3600;
 
@@ -162,11 +162,14 @@ export default async function VodProductPage({ params }: Props) {
             </div>
           )}
 
-          {/* CTA */}
+          {/* CTA — inline anchor to checkout section */}
           <div className="mt-6">
-            <Button variant="cta" size="lg">
+            <a
+              href="#checkout"
+              className="inline-flex h-14 items-center justify-center gap-2 rounded-button bg-accent-gold px-8 text-lg font-medium text-text-light transition-colors hover:bg-accent-gold-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-gold"
+            >
               Kupuję
-            </Button>
+            </a>
           </div>
 
           {/* Short description */}
@@ -237,6 +240,16 @@ export default async function VodProductPage({ params }: Props) {
                   </li>
                 ))}
               </ul>
+            </div>
+          )}
+          {/* Checkout */}
+          {product.active_price && currentPrice != null && (
+            <div id="checkout">
+              <Checkout
+                productId={product.id}
+                productTitle={product.title}
+                priceFormatted={formatPrice(currentPrice)}
+              />
             </div>
           )}
         </Container>

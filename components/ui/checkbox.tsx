@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils/cn";
 type CheckboxProps = React.ComponentPropsWithoutRef<
   typeof CheckboxPrimitive.Root
 > & {
-  label: string;
+  label: React.ReactNode;
 };
 
 const Checkbox = forwardRef<

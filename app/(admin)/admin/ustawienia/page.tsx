@@ -16,7 +16,7 @@ const CAMPAIGN_STATES = [
 export default function UstawieniaPage() {
   const { result, query: { isLoading } } = useList({
     resource: "site_settings",
-    pagination: { current: 1, pageSize: 1 },
+    pagination: { currentPage: 1, pageSize: 1 },
   });
   const settings = result.data?.[0] as Record<string, unknown> | undefined;
 

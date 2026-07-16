@@ -12,7 +12,6 @@ import {
   AccordionContent,
 } from "@/components/ui/accordion";
 import { SpeakerCard } from "@/components/speaker-card";
-import { Badge } from "@/components/ui/badge";
 
 export const revalidate = 3600;
 
@@ -105,7 +104,7 @@ export default async function PastEditionPage({ params }: Props) {
 
           {/* Date & venue */}
           <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-text-muted">
-            <span>{formatDate(event.date)}</span>
+            {event.date && <span>{formatDate(event.date)}</span>}
             {event.venue_name && <span>{event.venue_name}</span>}
             {event.venue_city && <span>{event.venue_city}</span>}
           </div>
@@ -175,8 +174,8 @@ export default async function PastEditionPage({ params }: Props) {
                   <SpeakerCard
                     key={speaker.id}
                     name={speaker.name}
-                    bio={speaker.bio}
-                    photo={speaker.photo}
+                    bio={speaker.bio ?? undefined}
+                    photo={speaker.photo ?? undefined}
                   />
                 ))}
               </div>

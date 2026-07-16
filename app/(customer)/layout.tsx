@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Container } from "@/components/layout/container";
+import { CustomerNav } from "@/components/customer-nav";
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
@@ -29,10 +30,19 @@ export default function CustomerLayout({
               >
                 Moje konto
               </Link>
+              <Link
+                href="/wylogowanie"
+                className="text-text-muted hover:text-text-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-gold"
+              >
+                Wyloguj
+              </Link>
             </nav>
           </div>
         </Container>
       </header>
+      <Container>
+        <CustomerNav />
+      </Container>
       <main>
         <Container className="py-8">{children}</Container>
       </main>

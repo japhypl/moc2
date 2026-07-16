@@ -12,14 +12,9 @@ import type {
   TixxTicketLink,
   VodItem,
   Redirect,
+  Profile,
 } from "@/lib/types/database";
 
-const PUBLISHED_FILTER = `status.eq.published`;
-
-function publishedNow() {
-  const now = new Date().toISOString();
-  return `and(or(publish_at.is.null,publish_at.lte.${now}),or(unpublish_at.is.null,unpublish_at.gt.${now}))`;
-}
 
 export async function getSiteSettings(): Promise<SiteSettings | null> {
   const supabase = await createClient();
@@ -78,7 +73,7 @@ export async function getEventBySlug(
 
   return {
     ...event,
-    speakers: (eventSpeakers ?? []).map((es: any) => es.speakers) as Speaker[],
+    speakers: (eventSpeakers ?? []).map((es: Record<string, unknown>) => es.speakers) as Speaker[],
     tixx_links: tixxLinks ?? [],
   };
 }
@@ -93,10 +88,10 @@ export async function getPublishedProducts(): Promise<
     .eq("status", "published")
     .order("created_at", { ascending: false });
 
-  return (products ?? []).map((p: any) => {
-    const activePrice =
-      p.product_prices?.find((pp: ProductPrice) => pp.is_active) ?? null;
-    const { product_prices, ...product } = p;
+  return (products ?? []).map((p) => {
+    const rec = p as unknown as Record<string, unknown> & { product_prices?: ProductPrice[] };
+    const activePrice = rec.product_prices?.find((pp) => pp.is_active) ?? null;
+    const { product_prices: _, ...product } = p as unknown as Product & { product_prices?: ProductPrice[] };
     return { ...product, active_price: activePrice };
   });
 }
@@ -137,17 +132,15 @@ export async function getProductBySlug(slug: string): Promise<
       .limit(1),
   ]);
 
-  const activePrice =
-    (product as any).product_prices?.find(
-      (pp: ProductPrice) => pp.is_active,
-    ) ?? null;
+  const typed = product as unknown as Product & { product_prices?: ProductPrice[] };
+  const activePrice = typed.product_prices?.find((pp) => pp.is_active) ?? null;
 
-  const { product_prices, ...rest } = product as any;
+  const { product_prices: _, ...rest } = typed;
 
   return {
     ...rest,
     active_price: activePrice,
-    vod_items: (vodItemJoins ?? []).map((j: any) => j.vod_items) as VodItem[],
+    vod_items: (vodItemJoins ?? []).map((j) => (j as unknown as Record<string, unknown>).vod_items) as VodItem[],
     lowest_30_day_price: priceHistory?.[0]?.price_minor ?? null,
   };
 }
@@ -228,5 +221,77 @@ export async function getFaqSections(): Promise<PageSection[]> {
 export async function getRedirects(): Promise<Redirect[]> {
   const supabase = await createClient();
   const { data } = await supabase.from("redirects").select("*");
+  return data ?? [];
+}
+
+export async function getUserProfileById(
+  userId: string,
+): Promise<Profile | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", userId)
+    .single();
+  return data;
+}
+
+export async function getUserEntitlements(userId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("entitlements")
+    .select("*, products(id, title, slug, cover_image, type)")
+    .eq("user_id", userId)
+    .is("revoked_at", null)
+    .or("expires_at.is.null,expires_at.gt." + new Date().toISOString())
+    .order("granted_at", { ascending: false });
+  return data ?? [];
+}
+
+export async function getUserOrders(userId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("orders")
+    .select(
+      "*, order_items(id, product_title, quantity, unit_price_minor, total_minor)",
+    )
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+  return data ?? [];
+}
+
+export async function getUserEntitlementForProduct(
+  userId: string,
+  productSlug: string,
+) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("entitlements")
+    .select("*, products!inner(id, title, slug, cover_image)")
+    .eq("user_id", userId)
+    .eq("products.slug", productSlug)
+    .is("revoked_at", null)
+    .or("expires_at.is.null,expires_at.gt." + new Date().toISOString())
+    .single();
+  return data;
+}
+
+export async function getUserDownloadableMaterials(userId: string) {
+  const supabase = await createClient();
+  const { data: entitlements } = await supabase
+    .from("entitlements")
+    .select("product_id")
+    .eq("user_id", userId)
+    .is("revoked_at", null)
+    .or("expires_at.is.null,expires_at.gt." + new Date().toISOString());
+
+  if (!entitlements?.length) return [];
+
+  const productIds = entitlements.map((e) => e.product_id);
+  const { data } = await supabase
+    .from("downloadable_materials")
+    .select("*")
+    .in("product_id", productIds)
+    .order("sort_order", { ascending: true });
   return data ?? [];
 }

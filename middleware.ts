@@ -8,7 +8,48 @@ export async function middleware(request: NextRequest) {
   const redirect = await checkRedirect(request, pathname);
   if (redirect) return redirect;
 
+  const authRedirect = await checkAuth(request);
+  if (authRedirect) return authRedirect;
+
   return await updateSession(request);
+}
+
+async function checkAuth(request: NextRequest): Promise<NextResponse | null> {
+  const { pathname } = request.nextUrl;
+  if (!pathname.startsWith("/konto")) return null;
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseAnonKey) return null;
+
+  const response = NextResponse.next({ request });
+  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet: { name: string; value: string; options?: Record<string, unknown> }[]) {
+        cookiesToSet.forEach(({ name, value }) =>
+          request.cookies.set(name, value),
+        );
+        cookiesToSet.forEach(({ name, value, options }) =>
+          response.cookies.set(name, value, options),
+        );
+      },
+    },
+  });
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/logowanie";
+    loginUrl.searchParams.set("next", pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  return null;
 }
 
 async function checkRedirect(

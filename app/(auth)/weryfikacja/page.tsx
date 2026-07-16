@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
-export default function VerificationPage() {
+function VerificationContent() {
   const [status, setStatus] = useState<"verifying" | "success" | "error">(
     "verifying"
   );
@@ -25,13 +25,11 @@ export default function VerificationPage() {
       }
     });
 
-    // Check if already authenticated (e.g., token in URL hash was auto-processed)
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
         setStatus("success");
         router.push(next);
       } else {
-        // Give the auth state change listener a moment, then show error
         setTimeout(() => {
           setStatus((current) => (current === "verifying" ? "error" : current));
         }, 5000);
@@ -63,5 +61,22 @@ export default function VerificationPage() {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+export default function VerificationPage() {
+  return (
+    <Suspense
+      fallback={
+        <Card>
+          <CardContent className="text-center">
+            <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-border border-t-accent-gold" />
+            <p className="mt-4 text-text-muted">Ładowanie...</p>
+          </CardContent>
+        </Card>
+      }
+    >
+      <VerificationContent />
+    </Suspense>
   );
 }
